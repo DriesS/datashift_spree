@@ -1,4 +1,4 @@
-  # Copyright:: (c) Autotelik Media Ltd 2010
+# Copyright:: (c) Autotelik Media Ltd 2010
 # Author ::   Tom Statter
 # Date ::     Aug 2010
 # License::   MIT ?
@@ -15,7 +15,7 @@ module DataShift
     class ProductLoader < SpreeBaseLoader
 
       # Options
-      #  
+      #
       #  :reload           : Force load of the method dictionary for object_class even if already loaded
       #  :verbose          : Verbose logging and to STDOUT
       #
@@ -35,26 +35,26 @@ module DataShift
       #   [:dummy]           : Perform a dummy run - attempt to load everything but then roll back
       #
       def perform_load( file_name, opts = {} )
-        
+
         logger.info "Product load from File [#{file_name}]"
-            
+
         options = opts.dup
 
         # In >= 1.1.0 Image moved to master Variant from Product so no association called Images on Product anymore
-        
-        # Non Product/database fields we can still process
-        @we_can_process_these_anyway =  ["images","variant_sku","variant_cost_price","variant_price","variant_images","stock_items"]
-          
+
+        # Non Product/database fields we can still  process
+        @we_can_process_these_anyway =  ['images',  "variant_price", "variant_sku", "stock_items"]
+
         # In >= 1.3.0 price moved to master Variant from Product so no association called Price on Product anymore
         # taking care of it here, means users can still simply just include a price column
         @we_can_process_these_anyway << 'price' if(DataShift::SpreeEcom::version.to_f >= 1.3 )
-      
+
         if(DataShift::SpreeEcom::version.to_f > 1 )
           options[:force_inclusion] = options[:force_inclusion] ? ([ *options[:force_inclusion]] + @we_can_process_these_anyway) : @we_can_process_these_anyway
         end
 
         logger.info "Product load using forced operators: [#{options[:force_inclusion]}]" if(options[:force_inclusion])
-        
+
         super(file_name, options)
       end
 
@@ -64,17 +64,17 @@ module DataShift
       # Method map represents a column from a file and it's correlated Product association.
       # Value string which may contain multiple values for a collection (has_many) association.
       #
-      def process(method_detail, value)  
+      def process(method_detail, value)
 
         raise ProductLoadError.new("Cannot process #{value} NO details found to assign to") unless(method_detail)
-          
+
         # TODO - start supporting assigning extra data via current_attribute_hash
         current_value, current_attribute_hash = @populator.prepare_data(method_detail, value)
-         
+
         current_method_detail = method_detail
-       
+
         logger.debug "Processing value: [#{current_value}]"
-        
+
         # Special cases for Products, generally where a simple one stage lookup won't suffice
         # otherwise simply use default processing from base class
         if(current_value && (current_method_detail.operator?('variants') || current_method_detail.operator?('option_types')) )
@@ -89,15 +89,9 @@ module DataShift
 
           add_properties
 
-        # This loads images to Product or Product Master Variant depending on Spree version
         elsif(current_method_detail.operator?('images') && current_value)
 
           add_images( load_object.master )
-        
-        # This loads images to Product Variants
-        elsif(current_method_detail.operator?('variant_images') && current_value)
-
-          add_variant_images(current_value)
 
         elsif(current_method_detail.operator?('variant_price') && current_value)
 
@@ -114,33 +108,18 @@ module DataShift
               else
                 puts "WARNING: Price entries did not match number of Variants - None Set"
               end
-            end
-
-          else
-            super
-          end
-
-        elsif(current_method_detail.operator?('variant_cost_price') && current_value)
-
-          if(@load_object.variants.size > 0)
-
-            if(current_value.to_s.include?(Delimiters::multi_assoc_delim))
-
-              # Check if we processed Option Types and assign  per option
-              values = current_value.to_s.split(Delimiters::multi_assoc_delim)
-
-              if(@load_object.variants.size == values.size)
-                @load_object.variants.each_with_index {|v, i| v.cost_price = values[i].to_f }
-                @load_object.save
-              else
-                puts "WARNING: Cost Price entries did not match number of Variants - None Set"
+            else
+              @load_object.variants.each do |v|
+                v.price = current_value.to_s.gsub(',','.').to_f
+                v.save
               end
             end
 
           else
-            super
-          end          
-          
+            @load_object.price = current_value.to_f
+            #super
+          end
+
         elsif(current_method_detail.operator?('variant_sku') && current_value)
 
           if(@load_object.variants.size > 0)
@@ -161,14 +140,14 @@ module DataShift
           else
             super
           end
-          
+
         #elsif(current_value && (current_method_detail.operator?('count_on_hand') || current_method_detail.operator?('on_hand')) )
         elsif(current_value && current_method_detail.operator?('stock_items'))
-          
+
           logger.info "Adding Variants Stock Items (count_on_hand)"
 
           save_if_new
-          
+
           add_variants_stock(current_value)
 
         else
@@ -190,12 +169,12 @@ module DataShift
       #  '|' seperates Variants
       #
       #   ';' list of option values
-      #  Examples : 
-      #  
+      #  Examples :
+      #
       #     mime_type:jpeg;print_type:black_white|mime_type:jpeg|mime_type:png, PDF;print_type:colour
       #
       def add_options_variants
-      
+
         # TODO smart column ordering to ensure always valid by time we get to associations
         begin
           save_if_new
@@ -208,10 +187,10 @@ module DataShift
         variants = get_each_assoc
 
         logger.info "Adding Options Variants #{variants.inspect}"
-        
-        # example line becomes :  
-        #   1) mime_type:jpeg|print_type:black_white  
-        #   2) mime_type:jpeg  
+
+        # example line becomes :
+        #   1) mime_type:jpeg|print_type:black_white
+        #   2) mime_type:jpeg
         #   3) mime_type:png, PDF|print_type:colour
 
         variants.each do |per_variant|
@@ -219,7 +198,7 @@ module DataShift
           option_types = per_variant.split(Delimiters::multi_facet_delim)    # => [mime_type:jpeg, print_type:black_white]
 
           logger.info "Checking Option Types #{option_types.inspect}"
-           
+
           optiontype_vlist_map = {}
 
           option_types.each do |ostr|
@@ -238,7 +217,7 @@ module DataShift
               end
               logger.info "Created missing OptionType #{option_type.inspect}"
             end
-                      
+
             # OptionTypes must be specified first on Product to enable Variants to be created
             load_object.option_types << option_type unless load_object.option_types.include?(option_type)
 
@@ -262,9 +241,9 @@ module DataShift
           logger.debug("Processing Options into Variants #{sorted_map.inspect}")
 
           # {mime => ['pdf', 'jpeg', 'gif'], print_type => ['black_white']}
-          
+
           lead_option_type, lead_ovalues = sorted_map.shift
-          
+
           # TODO .. benchmarking to find most efficient way to create these but ensure Product.variants list
           # populated .. currently need to call reload to ensure this (seems reqd for Spree 1/Rails 3, wasn't required b4
           lead_ovalues.each do |ovname|
@@ -276,9 +255,9 @@ module DataShift
             #TODO - not sure why I create the OptionValues here, rather than above with the OptionTypes
             ov = @@option_value_klass.where(:name => ovname, :option_type_id => lead_option_type.id).first_or_create(:presentation => ovname.humanize)
             ov_list << ov if ov
- 
+
             # Process rest of array of types => values
-            sorted_map.each do |ot, ovlist| 
+            sorted_map.each do |ot, ovlist|
               ovlist.each do |ov_for_composite|
 
                 ov_for_composite.strip!
@@ -291,14 +270,14 @@ module DataShift
             end
 
             unless(ov_list.empty?)
-              
+
               logger.info("Creating Variant from OptionValue(s) #{ov_list.collect(&:name).inspect}")
-              
+
               i = @load_object.variants.size + 1
 
-              variant = @load_object.variants.create( :sku => "#{load_object.sku}_#{i}", :price => load_object.price, :weight => load_object.weight, :height => load_object.height, :width => load_object.width, :depth => load_object.depth, :tax_category_id => load_object.tax_category_id)
+              variant = @load_object.variants.create( :sku => "#{load_object.sku}_#{i}", :price => load_object.price, :weight => load_object.weight, :height => load_object.height, :width => load_object.width, :depth => load_object.depth)
 
-              variant.option_values << ov_list if(variant)    
+              variant.option_values << ov_list if(variant)
             end
           end
 
@@ -335,10 +314,12 @@ module DataShift
           end
 
           if(property)
+
               # Property now protected from mass assignment
               x = @@product_property_klass.new( :value => find_by_value )
               x.property = property
               x.save
+
               @load_object.product_properties << x
               logger.info "Created New ProductProperty #{x.inspect}"
           else
@@ -366,7 +347,11 @@ module DataShift
 
           parent_name = name_list.shift
 
-          parent_taxonomy = @@taxonomy_klass.where(:name => parent_name).first_or_create
+          puts "Taxon with parent name #{parent_name}"
+
+          parent_taxonomy = @@taxonomy_klass.find_or_create_by(name: parent_name)
+
+          puts "After taxonomy create"
 
           raise DataShift::DataProcessingError.new("Could not find or create Taxonomy #{parent_name}") unless parent_taxonomy
 
@@ -375,8 +360,10 @@ module DataShift
           # Add the Taxons to Taxonomy from tree structure parent>child>child
           taxons = name_list.collect do |name|
 
+            puts "Creating taxon with name #{name}"
+
             begin
-              taxon = @@taxon_klass.where(:name => name, :parent_id => parent.id, :taxonomy_id => parent_taxonomy.id).first_or_create
+              taxon = @@taxon_klass.find_or_create_by(:name => name, :parent_id => parent.id, :taxonomy_id => parent_taxonomy.id)
 
               # pre Rails 4 -  taxon = @@taxon_klass.find_or_create_by_name_and_parent_id_and_taxonomy_id(name, parent && parent.id, parent_taxonomy.id)
 
@@ -428,12 +415,12 @@ module DataShift
           stock_coh_list = get_each_assoc # we expect to get corresponding stock_location:count_on_hand for every variant
 
           stock_coh_list.each_with_index do |stock_coh, i|
-  
+
             # count_on_hand column MUST HAVE "stock_location_name:variant_count_on_hand" format
             stock_location_name, variant_count_on_hand = stock_coh.split(Delimiters::name_value_delim)
 
             logger.info "Setting #{variant_count_on_hand} items for stock location #{stock_location_name}..."
-  
+
             if not stock_location_name # No Stock Location referenced, fallback to default one...
               logger.info "No Stock Location was referenced. Adding count_on_hand to default Stock Location. Use 'stock_location_name:variant_count_on_hand' format to specify prefered Stock Location"
               stock_location = @@stock_location_klass.where(:default => true).first
@@ -445,16 +432,16 @@ module DataShift
                 logger.info "Created New Stock Location #{stock_location.inspect}"
               end
             end
-  
+
             if(stock_location)
                 @@stock_movement_klass.create(:quantity => variant_count_on_hand.to_i, :stock_item => variants[i].stock_items.find_by_stock_location_id(stock_location.id))
                 logger.info "Added #{variant_count_on_hand} count_on_hand to Stock Location #{stock_location.inspect}"
             else
               puts "WARNING: Stock Location #{stock_location_name} NOT found - Can't set count_on_hand"
             end
-  
+
           end
-  
+
         # ... or just single Master Product?
         elsif(@load_object.variants.size == 0)
           if(current_value.to_s.include?(Delimiters::multi_assoc_delim))
@@ -483,260 +470,6 @@ module DataShift
             puts "WARNING: Stock Location #{stock_location_name} NOT found - Can't set count_on_hand"
           end
         end
-      end
-
-      def add_variant_images(current_value)
-        
-        save_if_new
-
-        # do we have Variants?
-        if(@load_object.variants.size > 0)
-
-          logger.info "[VARIANT IMAGES] - number of variants to process #{@load_object.variants.size}"
-
-          if(current_value.to_s.include?(Delimiters::multi_assoc_delim))
-            # Check if we've already processed Variants and assign count per variant
-            values = current_value.to_s.split(Delimiters::multi_assoc_delim)
-            # variants and variant_images number match?
-            raise "WARNING: Variant Images entries did not match number of Variants - None Set" unless (@load_object.variants.size == values.size)
-          end
-
-          variants = @load_object.variants # just for readability and logic
-
-          logger.info "Variants: #{@load_object.variants.inspect}"
-
-          # we expect to get corresponding images for every variant (might have more than one image for each variant!)
-          variants_images_list = get_each_assoc 
-
-          variants_images_list.each_with_index do |variant_images, i|
-
-            if(variant_images.to_s.include?(Delimiters::multi_value_delim))
-              # multiple images
-              images = variant_images.to_s.split(Delimiters::multi_value_delim)
-            else
-              # single image
-              images = []
-              images << variant_images 
-            end
-  
-            logger.info "Setting #{images.count} images for variant #{variants[i].name}..."
-
-            # reset variant images to attach to variant
-            var_images = []
-
-            # Image processing...
-            logger.debug "Images to process: #{images.inspect} for variant #{variants[i].name}"
-            images.each do |image|
-              @spree_uri_regexp ||= Regexp::new('(http|ftp|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&amp;:\/~\+#]*[\w\-\@?^=%&amp;\/~\+#])?' )
-              
-              if(image.match(@spree_uri_regexp))
-                 
-                uri, attributes = image.split(Delimiters::attribute_list_start)
-                
-                uri.strip!
-                
-                logger.info("Processing IMAGE from URI [#{uri.inspect}]")
-      
-                if(attributes)
-                  #TODO move to ColumnPacker unpack ?
-                  attributes = attributes.split(', ').map{|h| h1,h2 = h.split('=>'); {h1.strip! => h2.strip!}}.reduce(:merge)
-                  logger.debug("IMAGE has additional attributes #{attributes.inspect}")
-                else
-                  attributes = {} # will blow things up later if we pass nil where {} expected
-                end
-                
-                agent = Mechanize.new
-                
-                image = begin
-                  agent.get(uri)
-                rescue => e
-                  puts "ERROR: Failed to fetch image from URL #{uri}", e.message
-                  raise DataShift::BadUri.new("Failed to fetch image from URL #{uri}")
-                end
-        
-                # Expected image is_a Mechanize::Image
-                # image.filename& image.extract_filename do not handle query string well e,g blah.jpg?v=1234
-                # so for now use URI
-                # extname = image.respond_to?(:filename) ? File.extname(image.filename) : File.extname(uri)
-                extname = File.extname( uri.gsub(/\?.*=.*/, ''))
-      
-                base = image.respond_to?(:filename) ? File.basename(image.filename, '.*') : File.basename(uri, '.*')
-      
-                logger.debug("Storing Image in TempFile #{base.inspect}.#{extname.inspect}")
-      
-                @current_image_temp_file = Tempfile.new([base, extname], :encoding => 'ascii-8bit')
-                          
-                begin
-        
-                  # TODO can we handle embedded img src e.g from Mechanize::Page::Image ?      
-      
-                  # If I call image.save(@current_image_temp_file.path) then it creates a new file with a .1 extension
-                  # so the real temp file data is empty and paperclip chokes
-                  # so this is a copy from the Mechanize::Image save method.  don't like it much, very brittle, but what to do ...
-                  until image.body_io.eof? do
-                    @current_image_temp_file.write image.body_io.read 16384
-                  end           
-                  
-                  @current_image_temp_file.rewind
-      
-                  logger.info("IMAGE downloaded from URI #{uri.inspect}")
-      
-                  attachment = create_attachment(Spree::Image, @current_image_temp_file.path, nil, nil, attributes)
-                  
-                rescue => e
-                  logger.error(e.message)
-                  logger.error("Failed to create Image from URL #{uri}")
-                  raise DataShift::DataProcessingError.new("Failed to create Image from URL #{uri}")
-             
-                ensure 
-                  @current_image_temp_file.close
-                  @current_image_temp_file.unlink
-                end
-      
-              else     
-                
-                path, alt_text = image.split(Delimiters::name_value_delim)
-
-                alt_text = variants[i].name if !alt_text #ensure alt_text is filled
-      
-                logger.debug("Processing IMAGE from PATH #{path.inspect} #{alt_text.inspect}")
-                
-                path = File.join(config[:image_path_prefix], path) if(config[:image_path_prefix])
-      
-                attachment = create_attachment(Spree::Image, path, nil, nil, :alt => alt_text)
-
-              end 
-
-              logger.debug "#{attachment.inspect}"
-              var_images << attachment if attachment
-
-            end # images loop
-
-            # we have our variant images. Save them!
-            begin
-              # Link images to corresponding variant
-              variants[i].images << var_images
-              variants[i].save
-              logger.debug("Variant assigned Images from : #{var_images.inspect}")
-            rescue => e
-              puts "ERROR - Failed to assign attachments to #{variants[i].class} #{variants[i].id}"
-              logger.error("Failed to assign attachments to #{variants[i].class} #{variants[i].id}")
-            end
-  
-          end # variants_images_list loop
-  
-        # ... or just single Master Product?
-        elsif(@load_object.variants.size == 0)
-          
-            if(current_value.to_s.include?(Delimiters::multi_value_delim))
-              # multiple images
-              images = current_value.to_s.split(Delimiters::multi_value_delim)
-            else
-              # single image
-              images << variant_images 
-            end
-  
-            logger.info "Setting #{images.count} images for Master variant #{@load_object.master.name}..."
-
-            # Image processing...
-            images.each do |image|
-              @spree_uri_regexp ||= Regexp::new('(http|ftp|https):\/\/[\w\-_]+(\.[\w\-_]+)+([\w\-\.,@?^=%&amp;:\/~\+#]*[\w\-\@?^=%&amp;\/~\+#])?' )
-              
-              if(image.match(@spree_uri_regexp))
-                 
-                uri, attributes = image.split(Delimiters::attribute_list_start)
-                
-                uri.strip!
-                
-                logger.info("Processing IMAGE from URI [#{uri.inspect}]")
-      
-                if(attributes)
-                  #TODO move to ColumnPacker unpack ?
-                  attributes = attributes.split(', ').map{|h| h1,h2 = h.split('=>'); {h1.strip! => h2.strip!}}.reduce(:merge)
-                  logger.debug("IMAGE has additional attributes #{attributes.inspect}")
-                else
-                  attributes = {} # will blow things up later if we pass nil where {} expected
-                end
-                
-                agent = Mechanize.new
-                
-                image = begin
-                  agent.get(uri)
-                rescue => e
-                  puts "ERROR: Failed to fetch image from URL #{uri}", e.message
-                  raise DataShift::BadUri.new("Failed to fetch image from URL #{uri}")
-                end
-        
-                # Expected image is_a Mechanize::Image
-                # image.filename& image.extract_filename do not handle query string well e,g blah.jpg?v=1234
-                # so for now use URI
-                # extname = image.respond_to?(:filename) ? File.extname(image.filename) : File.extname(uri)
-                extname = File.extname( uri.gsub(/\?.*=.*/, ''))
-      
-                base = image.respond_to?(:filename) ? File.basename(image.filename, '.*') : File.basename(uri, '.*')
-      
-                logger.debug("Storing Image in TempFile #{base.inspect}.#{extname.inspect}")
-      
-                @current_image_temp_file = Tempfile.new([base, extname], :encoding => 'ascii-8bit')
-                          
-                begin
-        
-                  # TODO can we handle embedded img src e.g from Mechanize::Page::Image ?      
-      
-                  # If I call image.save(@current_image_temp_file.path) then it creates a new file with a .1 extension
-                  # so the real temp file data is empty and paperclip chokes
-                  # so this is a copy from the Mechanize::Image save method.  don't like it much, very brittle, but what to do ...
-                  until image.body_io.eof? do
-                    @current_image_temp_file.write image.body_io.read 16384
-                  end           
-                  
-                  @current_image_temp_file.rewind
-      
-                  logger.info("IMAGE downloaded from URI #{uri.inspect}")
-      
-                  attachment = create_attachment(Spree::Image, @current_image_temp_file.path, nil, nil, attributes)
-                  
-                rescue => e
-                  logger.error(e.message)
-                  logger.error("Failed to create Image from URL #{uri}")
-                  raise DataShift::DataProcessingError.new("Failed to create Image from URL #{uri}")
-             
-                ensure 
-                  @current_image_temp_file.close
-                  @current_image_temp_file.unlink
-                end
-      
-              else     
-                
-                path, alt_text = image.split(Delimiters::name_value_delim)
-
-                alt_text = @load_object.master.name if !alt_text #ensure alt_text is filled
-      
-                logger.debug("Processing IMAGE from PATH #{path.inspect} #{alt_text.inspect}")
-                
-                path = File.join(config[:image_path_prefix], path) if(config[:image_path_prefix])
-      
-                # create_attachment(klass, attachment_path, record = nil, attach_to_record_field = nil, options = {})
-                attachment = create_attachment(Spree::Image, path, nil, nil, :alt => alt_text)
-
-              end 
-
-              var_images << attachment if attachment
-
-            end # images loop
-
-            # we have our variant images. Save them!
-            begin
-              # Link images to corresponding variant
-              @load_object.master.images << var_images
-              @load_object.master.save
-              logger.debug("Master Variant assigned Images from : #{var_images.inspect}")
-            rescue => e
-              puts "ERROR - Failed to assign attachment to #{@load_object.master.class} #{@load_object.master.id}"
-              logger.error("Failed to assign attachment to #{@load_object.master.class} #{@load_object.master.id}")
-            end
-
-        end        
       end
 
     end
