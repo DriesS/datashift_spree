@@ -25,7 +25,7 @@ Gem::Specification.new do |s|
       s.add_runtime_dependency(%q<datashift>, [">= 0.15.0", "~> 0.15"])
       s.add_runtime_dependency(%q<mechanize>, [">= 2.6.0", "~> 2.6"])
     else
-      s.add_dependency(%q<datashift>, [">= 0.15.0", "~> 0.15"])
+      s.add_dependency(%q<datashift>, [">= 0.16.0"])
       s.add_dependency(%q<mechanize>, [">= 2.6.0", "~> 2.6"])
     end
   else
